@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "my-federated-project"
+version = "1.0.0"
+description = ""
+license = "Apache-2.0"
+dependencies = [
+    "flwr[simulation]>=1.23.0",
+    "flwr-datasets[vision]>=0.5.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "wandb>=0.17.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
+
+[tool.flwr.app]
+publisher = "Kaiser Quoc"
+
+[tool.flwr.app.components]
+serverapp = "my_federated_project.server_app:app"
+clientapp = "my_federated_project.client_app:app"
+
+[tool.flwr.app.config]
+num-server-rounds = 20
+fraction-train = 0.5
+fraction-evaluate = 1.0
+local-epochs = 5
+lr = 0.01
+batch-size = 32
+
+[tool.flwr.federations]
+default = "local-simulation"
+
+[tool.flwr.federations.local-simulation]
+options.num-supernodes = 10  
+
+[tool.flwr.federations.remote-federation]
+address = "<SUPERLINK-ADDRESS>:<PORT>"
+insecure = true
