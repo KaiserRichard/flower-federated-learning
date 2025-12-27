@@ -1,37 +1,122 @@
-# my-federated-project: A Flower / PyTorch app
+# Advanced Federated Learning with Flower & PyTorch
 
-## Install dependencies and project
+[![Flower](https://img.shields.io/badge/Flower-1.13-orange)](https://flower.ai)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red)](https://pytorch.org/)
+[![Weights & Biases](https://img.shields.io/badge/W%26B-Tracking-yellow)](https://wandb.ai/)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-The dependencies are listed in the `pyproject.toml` and you can install them as follows:
+A production-grade Federated Learning simulation built with **Flower (Flwr)** and **PyTorch**.
 
-```bash
-pip install -e .
+This project demonstrates how to implement **custom strategies** to solve complex FL challenges, specifically transmitting **arbitrary metadata** (like training time, loss history, and convergence status) from Client to Server alongside model weights.
+
+## 🚀 Key Features
+
+* **Custom Strategy (`CustomFedAdagrad`)**: Extends the standard `FedAdagrad` strategy to handle custom logic and aggregation.
+* **Arbitrary Metadata Transmission**:
+    * **Client-Side**: Calculates convergence (loss plateau), packs rich metrics into a dataclass, and serializes it using `pickle`.
+    * **Server-Side**: Intercepts the message, deserializes the metadata, and logs it for global analysis.
+* **Dynamic Learning Rate**: Implements LR decay (halves every 5 rounds) via the Strategy configuration.
+* **Experiment Tracking**: Integrated with **Weights & Biases (W&B)** for real-time visualization of global accuracy and client-specific metrics.
+* **Smart Checkpointing**: Automatically saves the global model to disk (`.pth`) whenever a new "best accuracy" is achieved.
+
+## 📂 Project Structure
+
+```text
+.
+├── my_federated_project
+│   ├── client_app.py       # Client logic: Train, Evaluate, Serialize Metadata
+│   ├── server_app.py       # Server config, Grid setup, Strategy initialization
+│   ├── strategy.py         # Custom Strategy: Metadata deserialization & W&B logging
+│   └── task.py             # Shared definitions: Model (Net), Data, Metadata Dataclass
+├── outputs/                # Timestamped model checkpoints (Ignored by Git)
+├── pyproject.toml          # Simulation configuration
+└── README.md
+
 ```
 
-> **Tip:** Your `pyproject.toml` file can define more than just the dependencies of your Flower app. You can also use it to specify hyperparameters for your runs and control which Flower Runtime is used. By default, it uses the Simulation Runtime, but you can switch to the Deployment Runtime when needed.
-> Learn more in the [TOML configuration guide](https://flower.ai/docs/framework/how-to-configure-pyproject-toml.html).
+## 🛠️ Installation
 
-## Run with the Simulation Engine
-
-In the `my-federated-project` directory, use `flwr run` to run a local simulation:
-
+1. **Clone the repository:**
 ```bash
-flwr run .
+git clone [https://github.com/KaiserRichard/flower-federated-learning.git](https://github.com/KaiserRichard/flower-federated-learning.git)
+cd flower-federated-learning
+
 ```
 
-Refer to the [How to Run Simulations](https://flower.ai/docs/framework/how-to-run-simulations.html) guide in the documentation for advice on how to optimize your simulations.
 
-## Run with the Deployment Engine
+2. **Install dependencies:**
+This project uses `flwr` with simulation support, `torch`, and `wandb`.
+```bash
+pip install flwr[simulation] torch torchvision flwr-datasets[vision] wandb
 
-Follow this [how-to guide](https://flower.ai/docs/framework/how-to-run-flower-with-deployment-engine.html) to run the same app in this example but with Flower's Deployment Engine. After that, you might be interested in setting up [secure TLS-enabled communications](https://flower.ai/docs/framework/how-to-enable-tls-connections.html) and [SuperNode authentication](https://flower.ai/docs/framework/how-to-authenticate-supernodes.html) in your federation.
+```
 
-You can run Flower on Docker too! Check out the [Flower with Docker](https://flower.ai/docs/framework/docker/index.html) documentation.
 
-## Resources
+3. **Log in to Weights & Biases (Optional):**
+To enable experiment tracking:
+```bash
+wandb login
 
-- Flower website: [flower.ai](https://flower.ai/)
-- Check the documentation: [flower.ai/docs](https://flower.ai/docs/)
-- Give Flower a ⭐️ on GitHub: [GitHub](https://github.com/adap/flower)
-- Join the Flower community!
-  - [Flower Slack](https://flower.ai/join-slack/)
-  - [Flower Discuss](https://discuss.flower.ai/)
+```
+
+
+
+## 🏃 Usage
+
+Run the simulation using the Flower CLI. The configuration (rounds, nodes, resources) is managed in `pyproject.toml`.
+
+```bash
+flwr run
+
+```
+
+### Configuration
+
+You can adjust parameters in `pyproject.toml`:
+
+```toml
+[tool.flwr.app.config]
+num-server-rounds = 20
+fraction-train = 0.5        # Train on 50% of available nodes per round
+local-epochs = 5            # Epochs per client
+lr = 0.01                   # Initial Learning Rate
+
+```
+
+## 🧠 Technical Deep Dive: Metadata Passing
+
+One of the biggest challenges in FL is sending data *other* than weights (e.g., "Did my model converge?"). This project solves it using a **Shared Dataclass Contract**:
+
+1. **Define**: A shared class `TrainProcessMetadata` is defined in `task.py`.
+2. **Serialize (Client)**: In `client_app.py`, we calculate convergence, create the object, and pickle it:
+```python
+train_metadata_bytes = pickle.dumps(train_metadata)
+config_record = ConfigRecord({"train_metadata": train_metadata_bytes})
+
+```
+
+
+3. **Deserialize (Strategy)**: In `strategy.py`, we override `aggregate_train` to unpack it:
+```python
+train_meta = pickle.loads(msg.content["metadata"]["train_metadata"])
+print(f"Client Converged: {train_meta.converged}")
+
+```
+
+
+
+## 📊 Dashboard & Results
+
+Metrics are tracked automatically. If using W&B, you will see:
+
+* **Global Accuracy & Loss** vs. Rounds
+* **Client Training Time** distribution
+* **Convergence Events**
+
+## 📜 License
+
+This project is licensed under the Apache 2.0 License.
+
+```
+
+```
